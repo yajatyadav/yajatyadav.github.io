@@ -2,6 +2,7 @@
 <html>
 
 <head>
+    <link rel="stylesheet" href="style.css">
     <title>Project 1</title>
     <style>
         body {
@@ -13,6 +14,196 @@
 
 <body>
     <h1>Project 1: Images of the Russian Empire -- Colorizing the Prokudin-Gorskii Photo Collection</h1>
+    <h2> Background</h2>
+    <p>In the early 1900s, Sergei Mikhailovich Prokudin-Gorskii traveled the Russian empire and recorded three exposures
+        of every scene onto a glass plate using a red, a green, and a blue filter. The Library of Congress has bought
+        and digitized these negatives.
+        In this project, we apply image processing techniques in order to take these glass plate images and produce a
+        color image with as few artifacts as possible.
+    </p>
+    <h2> Implementation </h2>
+    Overall, the implementation involved splitting up the image, then aligning the 3 color channels, and then combining
+    them to produce a color image.
+    <h3> Single-Scale Method</h3>
+    <p> After splitting the image into thirds (R, G, B), the blue image was used as a baseline, and the red and green
+        were aligned to the blue image.
+        Aligning G to B, for example, involved shifting G around in a range of 2D shifts (default being [-15, 15]), and
+        then using a loss function to quantify how well this shift aligned with B.
+        Ultimately, the shift with the lowest cost was selected. I implemented a few loss functions like l2-norm and NCC
+        (Normalized Cross-Correlation). Furthermore, to improve the loss functions, I only computed them on the inner
+        90% of the image
+        as that is the area whose good-alignment we want to emphasize (since the main information of the images is
+        generally all in the center).
+        Iterating over this range of 2D shifts ultimately gave us "best" displacements, that we could then use to create
+        the RGB image.
+    </p>
+    <h3> Multi-Scale Speedup: Image Pyramids</h3>
+    <p> While the above approach works on small images, it becomes increasingly unsustainable for larger images- for
+        very large images, operations like shifting them and computing the loss, take longer, and so repeating them
+        over a range of shifts is prohibitively slow. To address this, I implemented an image-pyramid-based recursive
+        version of the single-scale method. Essentially, the base case (small image) still reduces to the single-scale
+        algorithm.
+        However, if the image is large, we rescale it to half the size, and then recurse. The recursive call gives us
+        the best displacement for the half-size image.
+        By doubling this return value and centering our search-window around it, we are able to efficiently use the
+        coarser images to get an estimate of the alignment and then refine it further and further with each larger-scale
+        image.
+        Additionally, to keep this method fast, I make the search window size larger for the smaller images- for small
+        images, it's less of a penalty to have a large search window, so we can be more aggressive in finding the best
+        shift, and then lower our window
+        size once we get to the larger image.
+    <h2> Bells and Whistles</h2>
+    <h3> Better Features: Image Gradient</h3>
+    <p> Instead of using just the raw pixel values, this improvement uses the image gradient when aligning two images.
+        I calculate Sobel derivatives in the X and Y direction, and combine them in a fast way for an estimate of the
+        gradient.
+        This allows us to replace the image with a map of its edges (example image below) to be used for alignment.
+        Because this edge-image
+        has either really high or really low intensity pixels, it will lead to really high/low loss-values, making it
+        more likely we find the best
+        possible alignment. At the highest-level, this feature is implemented as a boolean use_grad that the user can
+        turn on/off.</p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/cathedral_gradients.jpg" style="width: 50%; height: auto;">
+                <p> BGR Image Gradients for Cathedral</p>
+            </td>
+            <td>
+                <img src="media/tobolsk_gradients.jpg" style="width: 50%; height: auto;">
+                <p>
+                    BGR Image Gradients for Tobolsk
+                </p>
+            </td>
+        </tr>
+    </table>
+    <h3> Auto Contrasting: Linearly Rescaling Intensities</h3>
+    <p> To improve the perceived image quality, I apply auto-contrasting the final output image. This involves linearly
+        rescaling the pixel intensities such that the min intensity goes to 0
+        and the max intensity goes to 1 (across all 3 color channels). </p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/emir_grad_False_contrast_False.jpg" style="width: 50%; height: auto;">
+                <p>Emir Output With
+                    No Image
+                    Gradient and No Auto-Contrast</p>
+            </td>
+            <td>
+                <img src="media/emir_grad_True_contrast_False.jpg" style="width: 50%; height: auto;">
+                <p>Emir Output With Only Image Gradient</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/emir_grad_False_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Emir Output With Only Auto Contrast</p>
+            </td>
+            <td>
+                <img src="media/emir_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Emir Output With Both Image Gradient AND Auto Contrast</p>
+            </td>
+        </tr>
+    </table>
+
+    <h1> Gallery </h1>
+    <p> The following gallery of color images was produced with both image gradients and auto-contrasting enabled.
+        Each image also has the red-to-blue and green-to-blue displacement listed. </a>
+    </p>
+
+    <table>
+        <tr>
+            <td>
+                <img src="media/cathedral_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Cathedral, Red Displacement: [12, 3], Green Displacement: [5, 2]</p>
+            </td>
+
+            <td>
+                <img src="media/monastery_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Monastery, Red Displacement: [3, 2], Green Displacement: [-3, 2]</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/tobolsk_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Tobolsk, Red Displacement: [6, 3], Green Displacement: [3, 3]</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/church_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Church, Red Displacement: [58, -5], Green Displacement: [26, 6]</p>
+            </td>
+
+            <td>
+                <img src="media/emir_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Emir, Red Displacement: [106, 39], Green Displacement: [49, 22]</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/harvesters_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Harvester, Red Displacement: [114, 16], Green Displacement: [53, 17]</p>
+            </td>
+
+            <td>
+                <img src="media/icon_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Icon, Red Displacement: [92, 23], Green Displacement: [45, 17]</p>
+            </td>
+
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/lady_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Lady, Red Displacement: [113, 11], Green Displacement: [52, 9]</p>
+            </td>
+
+            <td>
+                <img src="media/melons_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Melons, Red Displacement: [177, 14], Green Displacement: [81, 9]</p>
+            </td>
+        </tr>
+
+        <tr>
+
+            <td>
+                <img src="media/onion_church_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Onion Church, Red Displacement: [109, 37], Green Displacement: [51, 26]</p>
+            </td>
+
+            <td>
+                <img src="media/sculpture_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Sculpture, Red Displacement: [140, -27], Green Displacement: [34, -11]</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/self_portrait_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Self Portrait, Red Displacement: [173, 35], Green Displacement: [74, 26]</p>
+            </td>
+            <td>
+                <img src="media/three_generations_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Three Generations, Red Displacement: [105, 11], Green Displacement: [42, 17]</p>
+            </td>
+        </tr>
+
+        <tr>
+
+
+            <td>
+                <img src="media/train_grad_True_contrast_True.jpg" style="width: 50%; height: auto;">
+                <p>Train, Red Displacement: [79, 35], Green Displacement: [32, 7]</p>
+            </td>
+        </tr>
+
+
+    </table>
 </body>
 
 </html>
