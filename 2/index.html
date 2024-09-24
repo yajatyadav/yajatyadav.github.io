@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="style.css">
+    <title>Project 2</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Project 2: Fun with Filters and Frequencies!</h1>
+    <h2> Background</h2>
+    <p>This project looks at various uses of filters and frequencies in image processing. First, we look at taking
+        the partial derivatives and gradients of images. We then highlight the Derivative of Gaussian (DoG) filter, and
+        how
+        it allows us to both smooth and take derivatives with a single convolution.</p>
+
+    <p>
+        Then, by picking out the low and high frequency components of images, we are able to create a image sharpening
+        filter,
+        as well as combine the low/high frequency components of 2 differernt images to create hybrid images- images that
+        change in interpretation
+        based on viewing distance.
+    </p>
+
+    <p>
+        We conclude by implementing Gaussian and Laplacian stacks, which then enables us to utilize multiresolution
+        blending to compute a gentle seam between two images,
+        allowing us to smoothly blend together images.
+    </p>
+
+    <h2> Part 1: Fun With Filters </h2>
+    <h3> Part 1.1: Finite Difference Operator</h3>
+    <p> Convolving an image with the D_x and D_y kernels allows us to produce the partial derivative in x and in y.
+        We apply these to the cameraman image. Convolving with D_x allows us to see vertical edges, while convolving
+        with D_y allows us to see horizontal edges.
+        We are then able to create an edge image by using these partial derivatives im_dX and im_dY to compute the
+        gradient magnitude = np.sqrt(im_dX ** 2 + im_dY ** 2)
+        Finally, to get a clean black/white edge image, we binarize the gradient magnitudes by setting a threshold=0.3
+        Pixels above are set to 1, while those below to 0.
+    </p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td colspan="4">
+                <img src="media/cameraman.png" style="width: 25%;">
+                <p>Original Cameraman Image</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/cameraman_dX.png" style="width: 75%;">
+                <p> Image Partial Derivative dX</p>
+            </td>
+            <td>
+                <img src="media/cameraman_dY.png" style="width: 75%;">
+                <p>
+                    Image Partial Derivative dY
+                </p>
+            </td>
+
+            <td>
+                <img src="media/cameraman_grad_mag.png" style="width: 75%;">
+                <p> Gradient Magnitude Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_binarized_0.3.png" style="width: 75%;">
+                <p>
+                    Binarized Gradient Magnitude, threshold = 0.3
+                </p>
+            </td>
+        </tr>
+
+
+    </table>
+
+    <h3> Part 1.2: Derivative of Gaussian (DoG) Filter</h3>
+    <p> Here, we first blur the image through convolution with a 2D Gaussian, and then apply the process in 1.1 to
+        create an edge image.This way, we can remove some of the noise.
+        With the rule of thumb being to set the half-width of the kernel to be approximately 3*sigma for our gaussian 2D
+        filter,
+        I went with sigma=2, k=12. To create the 2D Gaussian, we can simply take the outer product of a 1D Gaussian and
+        its transpose.
+        Compared to the result of 1.1, we see that blurring the image first reduces noise in the final edge image, but
+        also leads to a bit blurrier edges.
+    </p>
+    <p>
+        Then, we show that the above can be accomplished with 1 convolution! By pre-computing (gaussian_2D * dX) and
+        (gaussian_2D * dY),we can directly use the resulting kernel to both smooth and take partial derivatives at the
+        same time (this follows from the associativity of the convolution operation)! The results, as seen in the 2nd
+        row, are the exact same as the first row!
+    </p>
+
+    <p>
+        For all convolution operations in this project, I chose mode = "same" in order to retain the original image's
+        size.
+        For boundary, I picked "symm", as reflecting the boundary pxiels for padding purposes produced the nicest image
+        compared to other padding methods.
+    </p>
+
+    <p>
+        <b>Answers to Questions from Part 1.2: </b> 1) Compared to the output of 1.1, we see that blurring the
+        image first
+        reduces noise in the final edge image, but also leads to a bit blurrier edges.
+        2) We notice that creating a derivative of gaussian filters first, and then convolving these with the image,
+        yields the same results as the previous part. This is because convolution is associative, so (img * gauss) *
+        deriv = img * (gauss * deriv). The final images look identical, and also have the same threshold value of 0.05.
+    </p>
+
+    <h4> Images Produced by Blurring First, Then 1.1</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td colspan="2">
+                <img src="media/cameraman.png" style="width: 40%">
+                <p> Original Cameraman Image</p>
+            </td>
+            <td colspan="2">
+                <img src="media/cameraman_blur.png" style="width: 40%">
+                <p> Blurred Cameraman Image</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/cameraman_blur_then_dX.png" style="width: 75%">
+                <p> dX of Blurred Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_blur_then_dY.png" style="width: 75%">
+                <p> dY of Blurred Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_blur_then_grad_mag.png" style="width: 75%">
+                <p> Gradient Magnitude of Blurred Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_blur_then_binarize_0.05.png" style="width: 75%">
+                <p> Binarzied Gradient Magnitude of Blurred Image, threshold=0.05</p>
+            </td>
+        </tr>
+    </table>
+
+    <h4> Images Produced by Convolving with DoG Directly</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td colspan="2">
+                <img src="media/DoG_dX.png" style="width: 40%">
+                <p> DoG dX Filter</p>
+            </td>
+            <td colspan="2">
+                <img src="media/DoG_dY.png" style="width: 40%">
+                <p> DoG dY Filter</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/cameraman_DoG_dX.png" style="width: 75%">
+                <p> DoG dX of Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_DoG_dY.png" style="width: 75%">
+                <p> DoG dY of Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_DoG_grad_mag.png" style="width: 75%">
+                <p> Gradient Magnitude Image</p>
+            </td>
+            <td>
+                <img src="media/cameraman_DoG_binarize_0.05.png" style="width: 75%">
+                <p> Binarzied Gradient Magnitude Image, threshold=0.05</p>
+            </td>
+        </tr>
+    </table>
+
+    <h2> Part 2: Fun With Frequencies!</h2>
+    <h3> Part 2.1: Image "Sharpening"</h3>
+    <p> The idea in this part is to sharpen an image by enhancing its high frequency components.
+        An easy way to obtain the high frequency components is by subtracting the low frequencies from the image,
+        and we can quickly get the low frequencies using the 2D Gaussian filter as a low-pass filter.
+        Then, we can add back these high-frequencies into our original image, weighted by a "sharpening coefficient"
+        alpha.
+        The higher alpha is, the stronger the higher frequencies will be in the final image.
+        If alpha is too high, however, the image may look too noisy and have artifacts - thus, we can qualitatively tune
+        alpha, and I have listed the "best" alpha for each image below.
+        Because the Gaussian filter is 2D, I perform this operation for each color channel separately and then combine
+        them together.
+    </p>
+    <p>
+        For the low-pass Gaussian filter, I picked sigma=1, k=6, following the same rule of thumb.
+    </p>
+
+    <h4> Sharpening Taj Mahal, Best Alpha = 2</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/taj.jpg" style="width: 95%">
+                <p> Original Image</p>
+            </td>
+
+            <td>
+                <img src="media/taj_alpha=1.png" style="width: 75%">
+                <p> alpha = 1</p>
+            </td>
+
+            <td>
+                <img src="media/taj_alpha=2.png" style="width: 75%">
+                <p> alpha = 2</p>
+            </td>
+
+            <td>
+                <img src="media/taj_alpha=5.png" style="width: 75%">
+                <p> alpha = 5</p>
+            </td>
+
+            <td>
+                <img src="media/taj_alpha=12.png" style="width: 75%">
+                <p> alpha = 12</p>
+            </td>
+        </tr>
+    </table>
+
+    <h4> Sharpening Eagle, Best Alpha = 5</h4>
+    <p> This eagle image might have had a higher alpha because it contains a lot of higher-frequency components like the
+        edges in the white fur, which would be further enhanced by a higher alpha. For higher alphas, we see the
+        background sky become noisy.
+    </p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/eagle.png" style="width: 75%">
+                <p> Original Image</p>
+            </td>
+
+            <td>
+                <img src="media/eagle_alpha=2.png" style="width: 75%">
+                <p> alpha = 2</p>
+            </td>
+
+            <td>
+                <img src="media/eagle_alpha=5.png" style="width: 75%">
+                <p> alpha = 5</p>
+            </td>
+
+            <td>
+                <img src="media/eagle_alpha=10.png" style="width: 75%">
+                <p> alpha = 10</p>
+            </td>
+
+            <td>
+                <img src="media/eagle_alpha=20.png" style="width: 75%">
+                <p> alpha = 20</p>
+            </td>
+        </tr>
+    </table>
+
+    <h4> Evaluation: Resharpening a Blurred Image </h4>
+    <p> To test the effectivness of this sharpening filter, we first start with an image, blur it, and then try to
+        sharpen the blurred image.
+        As we can see, after tweaking the alpha value to alpha=3, the resulting resharpened image looks pretty close to
+        the
+        original image, although it has does some issues like extra noise in the grass in front of the tiger.
+    </p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/tiger.png" style="width: 75%">
+                <p> Original Image</p>
+            </td>
+
+            <td>
+                <img src="media/tiger_blurred.png" style="width: 75%">
+                <p> Blurred Image</p>
+            </td>
+
+            <td>
+                <img src="media/tiger_alpha=1.png" style="width: 75%">
+                <p> Resharpened, alpha = 1</p>
+            </td>
+
+            <td>
+                <img src="media/tiger_alpha=3.png" style="width: 75%">
+                <p> Resharpened, alpha = 3</p>
+            </td>
+
+            <td>
+                <img src="media/tiger_alpha=5.png" style="width: 75%">
+                <p> Resharpened, alpha = 5</p>
+            </td>
+        </tr>
+    </table>
+
+    <h3> Part 2.2: Hybrid Images</h3>
+    <p> Here, we create hybrid images - images that change in interpretation based on viewing distance. Because higher
+        frequencies tend to dominate human perception for closer distances,
+        if we create an image by blending the high frequency components of im1 and the low frequency components of im2,
+        we get a hybrid image- this image appears like im2 from a distance, but more like im1 closer up.
+        We start by creating a hybrid image of Derek and his cat Nutmeg.
+        The cutoff-frequencies for both the low and high pass was chosen after some experimentation, and this was used
+        to set the Gaussians' k and sigma values.
+        Then, I created 3 additional hybrid images, where each pair explores a different concept (different faces,
+        hanges over time, etc.), and I perform a frequency analysis for one of them.
+        This analysis involves looking at the log-magnitude of the Fourier transform of the various images in the
+        process (original, low-freq, high-freq, combined). The final pair is a failure scenario, where the hybrid image
+        did not turn as good,
+        despite a lot of tuning with the cutoff frequencies.
+        Finally, for the Bells & Whistles, I explore the impact of including color in the low and/or
+        high frequency components by using the Derek and Nutmeg hybrid image as an example.
+    <p>
+
+    <h4>Derek and Nutmeg</h4>
+    <p> I aligned the 2 images using their eyes.</p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/DerekPicture.jpg" style="width:33%">
+                <p>Image 1</p>
+            </td>
+
+            <td>
+                <img src="media/nutmeg.jpg" style="width:33%">
+                <p>Image 2</p>
+            </td>
+            <td>
+                <img src="media/derek_nutmeg_hybrid.png" style="width:75%">
+                <p> Hybrid Image</p>
+            </td>
+        </tr>
+    </table>
+
+    <h4>Sprinter, with Fourier Analysis </h4>
+    <p> To get the two images, I used 2 frames from the following <a href="https://www.youtube.com/watch?v=uUC3OzpMBbY">
+            YouTube video </a></p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/run_before.jpg">
+                <p>Image 1</p>
+            </td>
+
+            <td>
+                <img src="media/run_after.jpg">
+                <p>Image 2</p>
+            </td>
+            <td text-align: center;>
+                <img src="media/runner_hybrid.png" style="width:65%">
+                <p>Hybrid Image </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/log_mag_im1.png">
+                <p>Image 1 log-magnitude of Fourier transform (FT) </p>
+            </td>
+            <td>
+                <img src="media/log_mag_im2.png">
+                <p>Image 2 log-magnitude of FT</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/log_mag_low.png">
+                <p>Image 1 Filtered (low-frequencies) log-magnitude of FT</p>
+            </td>
+            <td>
+                <img src="media/log_mag_high.png">
+                <p>Image 2 Filtered (high-frequencies) log-magnitude of FT</p>
+            </td>
+
+            <td>
+                <img src="media/log_mag_hybrid.png">
+                <p>Hybrid Image log-magnitude of FT</p>
+            </td>
+        </tr>
+
+
+    </table>
+
+    <h4> Messi and Ronaldo, the 🐐🐐</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/messi.jpg" style="width:75%">
+                <p>Image 1</p>
+            </td>
+
+            <td>
+                <img src="media/ronaldo.jpg" style="width:75%">
+                <p>Image 2</p>
+            </td>
+            <td>
+                <img src="media/messi_ronaldo_hybrid.png" style="width:30%">
+                <p> Hybrid Image</p>
+            </td>
+        </tr>
+    </table>
+
+
+    <h4>Failure: Dolphin and Toucan</h4>
+    <p> As you can see below, even the best-looking hybrid image isn't that good- instead of being 2 different things at
+        different distances, the image just looks like both a dolphin and a toucan at all distances.
+        Some reasons may be because the animals aren't aligned, they are too different from each other, and their
+        frequency contents are in the human visual range but still very distinct from each other.
+    </p>
+    <table style="text-align: center;">
+        <td>
+            <img src="media/dolphin.jpg" style="width:33%">
+            <p>Image 1</p>
+        </td>
+
+        <td>
+            <img src="media/toucan.jpg" style="width:33%">
+            <p>Image 2</p>
+        </td>
+        <td>
+            <img src="media/dolphin_toucan_hybrid.png" style="width:95%">
+            <p> Hybrid Image</p>
+        </td>
+        </tr>
+    </table>
+
+
+
+    <h4>Bells and Whistles: Impact of Color, Using Derek and Nutmeg</h4>
+    <p> I found that including color just for the high-frequency image (and keeping the low one in grayscale) worked
+        best in creating the hybrid effect. This supports what we learned in lecture, that
+        cones are more sensitive to higher frequencies than rods. All images above were generated with only the high
+        frequencies colored. My hybrid_image() function has a string parameter mode, which can be
+        "grayscale", "color_high", "color_low", or "color_both". Using this and keeping all other parameters fixed, I
+        show the results of the 4 modes ith Derek and Nutmeg below. Qualitatively, using "color_high" produces the best
+        hybrid images.
+    </p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/derek_nutmeg_gray.png">
+                <p>Grayscale for Both</p>
+            </td>
+
+            <td>
+                <img src="media/derek_nutmeg_hybrid.png" style="width:35%">
+                <p>Color for only High Frequency Image</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/derek_nutmeg_color_low.png">
+                <p>Color for only Low Frequency Image </p>
+            </td>
+            <td>
+                <img src="media/derek_nutmeg_color_both.png">
+                <p>Color for Both</p>
+            </td>
+        </tr>
+    </table>
+
+
+
+
+    <h3> Part 2.3: Gaussian and Laplacian Stacks</h3>
+    <p> In this part, we implement the Gaussian and Laplacian stacks. A stack is like a pyramid without the subsampling
+        step.
+        Thus, in the Gaussian stack, each subsequent image is produced by blurring the current image but not
+        subsampling.
+        To produce the laplacian stack, an element i is produced by subtracting the (i+1)th entry of the Gaussian stack
+        from the ith entry of the Gaussian stack.
+        Effectively, each entry in the Laplacian stack stores the high frequencies that were removed from the
+        corresponding Gaussian stack's entry due to blurring.
+        Thus, the first Laplacian entry would store a band of the highest frequencies, the next entry would store a band
+        of the second highest frequencies, and so on.
+        The Gaussian and Laplacian stacks for both the apple and orange are visualized below. In the next part, we will
+        use these to create the Oraple!
+    </p>
+
+    <p> Apple Gaussian Stack </p>
+    <img src="media/apple_gaussian_stack.png">
+    <p> Apple Laplacian Stack</p>
+    <img src="media/apple_laplacian_stack.png">
+    <p> Orange Gaussian Stack</p>
+    <img src="media/orange_gaussian_stack.png">
+    <p> Orange Laplacian Stack</p>
+    <img src="media/orange_laplacian_stack.png">
+
+    <h3> Part 2.4: Multiresolution Blending</h3>
+    <p> In this part, we utilize the guassiand laplacian stacks from above to smoothly seam 2 images together!
+        To recreate the Oraple, we use these stacks in the following manner: because weighted interpolation is
+        "smooth" only when the 2 images contain a small band of frequencies, we can effectively seam together the orange
+        and apple images from each level of the laplacian. We must also repeat this process for the very last entries of
+        both the apple
+        and orange gaussians,
+        as these represent the lowest frequencies not captured by our laplacian stack.
+        Once we have this stack of nicely-seamed images, we can then simply add them to get the oracle.
+        At each level, when we seam, we use a blurrier and blurrier version of the mask filter.
+    <p> To get a nicer seam, I use larger Gaussian and Laplacian stacks compared to 2.3, as seen below. Please scroll
+        horizontally to see the full stacks. </p>
+    </p>
+    <p>
+        I repeat this process of multiresolution blending with 2 other pairs of images- the first uses a horizontal
+        seam, while the second uses an irregular mask. In order to get a good seam, I also manually the crop/resize the
+        images beforehand.
+    </p>
+    <h4> Bells and Whistles</h4>
+    <p> I implement all of the multiresolution blending described above in color - this involves performing the
+        operations on each color channel and then combining the results.</p>
+    <h4> Results with Apple and Orange (Vertical Seam) </h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/apple.jpeg" style="width: 200px; height: 200px;">
+                <p> Apple Image</p>
+            </td>
+
+            <td>
+                <img src="media/orange.jpeg" style="width: 200px; height: 200px;">
+                <p> Orange Image</p>
+            </td>
+
+            <td>
+                <img src="media/oa_init_mask.png" style="width: 200px; height: 200px;">
+                <p> Initial Mask</p>
+            </td>
+        </tr>
+    </table>
+    <p> Apple Orange Mask Stack</p>
+    <img src="media/oa_mask_stack.png">
+    <p> Apple Orange Left Stack</p>
+    <img src="media/oa_left_stack.png">
+    <p> Apple Orange Right Stack</p>
+    <img src="media/oa_right_stack.png">
+    <p> Apple Orange Final Stack</p>
+    <img src="media/oa_final_stack.png">
+    <p> Apple Orange Final Image</p>
+    <img src="media/oa_final_im.png">
+
+    <h4> Results with Baobab and Skyscraper (Horizontal Seam)</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/baobab.jpeg">
+                <p> Baobab Image</p>
+            </td>
+
+            <td>
+                <img src="media/skyscraper.jpg">
+                <p> Skyscraper Image</p>
+            </td>
+
+            <td>
+                <img src="media/bs_init_mask.png">
+                <p> Initial Mask</p>
+            </td>
+        </tr>
+    </table>
+    <p> Baobab Skyscraper Mask Stack</p>
+    <img src="media/bs_mask_stack.png">
+    <p> Baobab Skyscraper Top Stack</p>
+    <img src="media/bs_left_stack.png">
+    <p> Baobab Skyscraper Bottom Stack</p>
+    <img src="media/bs_right_stack.png">
+    <p> Baobab Skyscraper Final Stack</p>
+    <img src="media/bs_final_stack.png">
+    <p> Baobab Skyscraper Final Image</p>
+    <img src="media/bs_final_im.png">
+
+    <h4> Results with Moon and Sunset (Irregular Mask)</h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/moon.jpg" style="width: 200px; height: 200px;">
+                <p> Moon Image</p>
+            </td>
+
+            <td>
+                <img src="media/sun.jpg" style="width: 200px; height: 200px;">
+                <p> Sunset Image</p>
+            </td>
+            <td>
+                <img src="media/ms_init_mask.png" style="width: 200px; height: 200px;">
+                <p> Initial Mask</p>
+            </td>
+        </tr>
+    </table>
+    <p> Moon Sunset Mask Stack</p>
+    <img src="media/ms_mask_stack.png">
+    <p> Moon Sunset Moon Stack</p>
+    <img src="media/ms_left_stack.png">
+    <p> Moon Sunset Sunset Stack</p>
+    <img src="media/ms_right_stack.png">
+    <p> Moon Sunset Final Stack</p>
+    <img src="media/ms_final_stack.png">
+    <p> Moon Sunset Final Image</p>
+    <img src="media/ms_final_im.png">
+
+
+
+    <h2> Takeaways From This Project</h2>
+    <p> The most important thing I learned from this project was connecting the math of low/high frequencies, to what
+        they visually look like! I better understand how edges in images
+        can lead to higher frequency components, how the background content is genereally the lower-frequency, and other
+        ideas about how frequencies in images look like visually. </p>
+</body>
