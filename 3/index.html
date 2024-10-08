@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="style.css">
+    <title>Project 3 </title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1> Project 3: Face Morphing</h1>
+    <h2> Background </h2>
+    <p> In this project, I start by producing a morph animation of my face into George's face. In order to do this, I
+        first
+        select corresponding points using the web tool. I then average these points for me and George to get an average
+        shape. I perform Delauny triangulation on this average shape, and this triangulation is used for all subsequent
+        parts relating to this morph.
+        I visualize the correspondences, as well as the triangulation and its overlay on me/George's face.
+        Then, I am able to use these results in order to implement a more general morph() function, which allows me to
+        slowly transition from Image A to Image B.
+        I use this morph function to create a GIF morphing my face to George's.
+    </p>
+    <p> In the next part of the project, I use the Brazil Face Database, and work with the subset of images that have a
+        neutral facial expression. Using this dataset,
+        I find the mean face shape, morph various faces to this shape, as well as find the mean face. I also add
+        correspondences on my face, and use these to 1) warp my face into the mean face shape and 2) warp the mean face
+        into my geometry
+    </p>
+
+    <p> Finally, by simply allowing the warp_frac and dissolve_frac parameters to go above 1, I am able to start at the
+        population mean desscribed above and extrapolate from it, thus creating a caricature of my face.</p>
+
+    <p> I conclude with implementing one of the Bells and Whistles, as described below.</p>
+
+    <h2> Part 1: Defining Correspondences </h2>
+    <p> As part of a smooth morph, we must define corresponding features between the two images, such as noses, eyes,
+        hairline, etc. This way, these components nicely deform from the source to the target.
+        I use the web <a href="https://cal-cs180.github.io/fa23/hw/proj3/tool.html"> interface </a> to label points and
+        export the JSON. However, at the start of my code, I do reverse the order in which the JSON file stores the
+        im1Points and im2Points lists, so that the data is compatible with the rest of my code.
+    </p>
+
+    <p> Then, I use the two image_point lists to compute an average face shape, and perform Delauny triangulation on
+        this average shape. This way, I can ensure that my triangles aren't too skinny, and by using the average, to
+        lessen their potential deformations.
+    </p>
+
+    <p> Below, I have visualized: 1) the starting correspondences between me and George, 2) overlaying the average
+        shape's triangulation over my face and points, 4) overlaying the triangulation over
+        George's face and points</p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td colspan="2">
+                <img src="media/correspondences.png">
+                <p>Yajat and George Correspondences</p>
+            </td>
+        </tr>
+        <tr>
+            <td></td>
+            <img src=" media/avg_points.png">
+            <p>Average Shape and Its Triangulations </p>
+            </td>
+            <td>
+                <img src=" media/triangulations.png">
+                <p>Yajat and George Triangulations</p>
+            </td>
+        </tr>
+    </table>
+
+    <h2> Part 2: Computing the "Mid-Way Face"</h2>
+    <p> In this part, I implemented the mid_way_face function, which takes in two face and returns the mid-way face.
+        Computing the average shape was easy and something I had already done when finding the triangulations. The next
+        step was warping each face to the average shape, and this required the most work. Finally, we cross-dissolve the
+        two warped images to get the final mid-way image.
+        Here are the detailed steps I took to accomplis thish:
+    </p>
+    <ol>
+        <li>
+            Implement compute_affine(tri1_points, tri2_points): this function finds the 3x3 affine transformation matrix
+            that deforms triangle_1 to triangle_2. I accomplished this by first finding a change of basis matrix to go
+            from triangle_1 to the "standard triangle" ( vertices at (0,0), (1,0), (0,1)), and then a matrix to go from
+            the standard triangle to triangle_2. Then, composing these matrices gives us the final A matrix. In order to
+            not be restricted to linear maps (and be able to get an affine transformation), I added a 3rd "dummy"
+            dimension and set it to 1 for all vectors involved.
+        </li>
+        <li>
+            When warping im to avg, first find the A matrix. Then, use inverse-warping with A_inv to obtain an array of
+            "source points" needed for us to determine the color at each target image pixel (the target is avg here).
+        </li>
+        <li>
+            This array of source points was filled with decimals, so I used bilinear interpolation in order to get a
+            nice combination of source pixel values.
+            Further, since I only wanted the current iteration's triangle to matter, the "source image" for
+            interpolation was created by applying a polygon mask over the original image.
+        </li>
+        <li> I used skimage.draw.polygon to enable the polygon masking I mentioned above.
+
+        </li>
+        <li>
+            The process in steps 1-4 was repeated for each triangle in order to implement warp_image_to_avg(...). Then,
+            I
+            could simply use this function twice to warp both my face and George's face to the average shape.
+        </li>
+
+        <li>
+            After the above warping was done, cross-dissolving was straigthforward- just average the 2 warped images,
+            giving us the final mid-way face.
+        </li>
+    </ol>
+
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/yajat.png">
+                <p> Yajat Starting Image</p>
+            </td>
+            <td>
+                <img src="media/yajat_to_mean.png">
+                <p> Yajat Warped to the Average Shape</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <img src="media/george.png">
+                <p> George Starting Image</p>
+            </td>
+            <td>
+                <img src="media/george_to_mean.png">
+                <p> George Warped to the Average Shape</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td colspan="2">
+                <img src="media/midway_face.png">
+                <p> Final "Mid-Way Face"</p>
+            </td>
+        </tr>
+    </table>
+
+    <h2> Part 3: The Morph Sequence</h2>
+    <p> In this part, I utilize the work from the previous part to allow us to have a smooth morphing animation from
+        Yajat to George. Essentially, I utilized my warp_image_to_avg function from part 2 to implement this part's
+        morph() function. I used warp_frac to take a convex combination of im1 and im2, and this served as our "average"
+        image from before.
+        This way, we could use reuse the methods from before to warp each image to this "average" shape. Then, for the
+        cross-dissolve stage, I just used dissolve_frac to take a convex combination of these warped images, giving us
+        any arbitrary morphed image in the sequence from Yajat to George. To get the nice animation from Yajat to
+        George, I created 46 frames, where I used a
+        linear strategy: frame i was created by calling morph() with warp_frac = dissolve_frac = i/45. I then saved this
+        as a GIF, displayed below. The first and last frames in the GIF are shown for 1s, then the rest of the GIF runs
+        at 30 FPS.
+    </p>
+
+
+    <img src="media/yajat_to_george.gif" style="width:30%">
+
+
+
+
+    <h2> Part 4: The "Mean face" of a population</h2>
+    <p>
+        In this part, I chose the Brazil Face Dataset, and focused on the subset of faces with a neutral facial
+        expression. I first found the average face shape with an identical method as part 1 - I simply averaged each
+        face's keypoint data to get the average shape. However, to improve the warping in the previous step, I also
+        added four corner points at each image- I did this by simply looping through all the .pts file and appending the
+        same 4 points for each file.
+    </p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/brazil_average_shape.png">
+                <p>Average Face Shape of Brazil Neutral Expression Dataset</p>
+
+            </td>
+        </tr>
+    </table>
+
+    <p> Next, I morphed each image in the dataset to this average shape, using the warp_image_to_avg function from
+        before. I have highlighted the morphing results for a few faces below.</p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/brazil_original_1.png">
+                <p>Example 1: Original Image</p>
+            </td>
+            <td>
+                <img src="media/brazil_morph_1.png">
+                <p>Morphed to Average Shape</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/brazil_original_2.png">
+                <p>Example 2: Original Image</p>
+            </td>
+            <td>
+                <img src="media/brazil_morph_2.png">
+                <p>Morphed to Average Shape</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/brazil_original_3.png">
+                <p>Example 3: Original Image</p>
+            </td>
+            <td>
+                <img src="media/brazil_morph_3.png">
+                <p>Morphed to Average Shape</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/brazil_original_4.png">
+                <p>Example 4: Original Image</p>
+            </td>
+            <td>
+                <img src="media/brazil_morph_4.png">
+                <p>Morphed to Average Shape</p>
+            </td>
+        </tr>
+        <tr></tr>
+        <td>
+            <img src="media/brazil_original_5.png">
+            <p>Example 5: Original Image</p>
+        </td>
+        <td>
+            <img src="media/brazil_morph_5.png">
+            <p>Morphed to Average Shape</p>
+        </td>
+        </tr>
+
+    </table>
+
+    <p> Next, I computed the average face of the population through a similar process- after morphing ALL faces in the
+        dataset to the average shape, cross-dissolving all of these morphed images with equal weight to each image gave
+        me the final average face for this dataset. Below is the average Brazilian face (neutral expression), as well as
+        with
+        its correspondences.
+    </p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/brazil_average_face_plain.png">
+                <p>Average Face of Brazil Neutral Expression Dataset</p>
+            </td>
+            <td>
+                <img src="media/brazil_average_face.png">
+                <p>Average Face with its Correspondences</p>
+
+            </td>
+        </tr>
+    </table>
+
+    <p> Finally, I show the following two results: 1) warping my face into the average face geometry for this dataset
+        found above, and 2) warping the average face above into my face's geometry. These steps required me to manually
+        label correspondences on my face that match the structure of the point correspondces in the brazil dataset, and
+        I accomplished this using by using "1a.jpg" as a reference image and using it to select points on my face using
+        the web tool.
+    </p>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/yajat_brazil_correspondences.png">
+                <p>Yajat Correspondences Using the Brazil Dataset Points</p>
+
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/yajat_to_brazil_avg.png">
+                <p>Yajat Warped into Average Brazil Geometry</p>
+
+            </td>
+            <td>
+                <img src="media/brazil_avg_to_yajat.png">
+                <p>Average Brazil Face Warped into Yajat Geometry</p>
+            </td>
+        </tr>
+    </table>
+
+    <h2> Part 5: Caricatures: Extrapolating from the mean</h2>
+    <p> In this part, I use the Brazilian face mean I calculate earlier and extrapolate from it. This can be done by
+        simply allowing dissolve_frac and warp_frac to go above 1 (or below 0) in my morph() function. This way, I am
+        able to move extra in the
+        direction of my face -> average Brazilian face, but go "beyond" the endpoint, thus extrapolating.Because the
+        brazil dataset is in black and white, I also convert my image to grayscale so that the cross-dissolve is nicer.
+        Below are a few extrapolations, as well as their corresponding warp_frac and dissolve_frac values.
+    </p>
+
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/yajat_extrapolate_1.png" style="width:66%">
+                <p>warp_frac = 1.5, disolve_frac = 0</p>
+
+            </td>
+            <td>
+                <img src="media/yajat_extrapolate_2.png" style="width:66%">
+                <p>warp_frac = 0, disolve_frac = 1.5</p>
+
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/yajat_extrapolate_3.png" style="width:66%">
+                <p>warp_frac = 1.5, disolve_frac = 1.5</p>
+
+            </td>
+            <td>
+                <img src="media/yajat_extrapolate_4.png" style="width:66%">
+                <p>warp_frac = 1.6, disolve_frac = 0.7</p>
+            </td>
+        </tr>
+    </table>
+
+
+    <h2> Bells and Whistles: Changing Gender and Ethnicity</h2>
+    <p> Following the same ideas from before, in this part, I change my face's gender and ethnicity. In order to do so,
+        I first got the average Indian woman face and average French man face from this <a
+            href=" https://leadingpersonality.wordpress.com/2013/09/30/average-faces-of-men-and-women-around-the-world/">
+            website</a>. For each image, I show morph animations, where 1) only the shape is morphed, 2) only the
+        appearance is morphed (cross-dissolving), and 3) both are morphed. I resized and adjusted these images to match
+        my existing yajat.png image. I then do the
+        following: </p>
+    <ol>
+        <li>
+            Change my gender: Because I am an Indian-American man, in order to just change my gender, I use the average
+            face of an Indian woman. Similar to parts 1-3 above, I first find the triangulation on the average shape,
+            and then use the morph() method with im1 = yajat and im2=average_indian_woman to generate the morphing
+            animations. By varying whether warp_frac and/or dissolve_frac are allowed to vary over time, I can generate
+            the 3
+            animations described above (if warp_frac = 0 always, we are only morphing the appearance; if dissolve_frac =
+            0 always, we
+            are only morphing the shape; if both non-zero, we are morphing using both)
+            I used the web tool to label the average Indian woman face's features, using the same
+            correspondences as those of the starting yajat image's points. I also used an online GIF tool to make some
+            minor tweaks to the output animations, like making the first and last frames hold for longer.
+        </li>
+        <li> Similarly, change my ethnicity: Here, I use the average face of a French man. Again, I find the
+            triangulation on the average shape, and use the morph() method with im1= yajat and im2=average_french_man to
+            generate the morphing animations from above. I used the web tool to label the average French man face's
+            features in an
+            identical fashion as described above.</li>
+    </ol>
+    <p> Relevant intermediate results, as well as the final morphing GIFs, can be found below </p>
+
+    <h4> Results of Morphing Yajat to Average Indian Woman </h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/yajat_labels.png">
+                <p> Yajat Correspondences </p>
+            </td>
+            <td>
+                <img src="media/avg_woman_india.jpg" style="width:60%;">
+                <p> The Average Indian Woman Face</p>
+            </td>
+            <td>
+                <img src="media/woman_labels.png">
+                <p> Average Indian Woman Correspondences </p>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <img src="media/yajat_woman_correspondences.png">
+                <p> Yajat and Woman Triangulation </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/yajat_to_woman_shape.gif" style="width:60%">
+                <p>Morphing Only Shape </p>
+            </td>
+            <td>
+                <img src="media/yajat_to_woman_appearance.gif" style="width:60%">
+                <p> Morphing Only Apperance </p>
+            </td>
+            <td>
+                <img src="media/yajat_to_woman_both.gif" style="width:60%">
+                <p> Morphing Both Shape and Appearance</p>
+            </td>
+        </tr>
+    </table>
+
+    <h4> Results of Morphing Yajat to Average French Man </h4>
+    <table style="text-align: center;">
+        <tr>
+            <td>
+                <img src="media/yajat_labels.png">
+                <p> Yajat Correspondences </p>
+            </td>
+            <td>
+                <img src="media/avg_man_france.jpg" style="width:60%;">
+                <p> The Average French Man Face</p>
+            </td>
+            <td>
+                <img src="media/french_labels.png">
+                <p> Average Indian Woman Correspondences </p>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <img src="media/yajat_french_correspondences.png">
+                <p> Yajat and Woman Triangulation </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/yajat_to_french_shape.gif" style="width:60%">
+                <p>Morphing Only Shape </p>
+            </td>
+            <td>
+                <img src="media/yajat_to_french_appearance.gif" style="width:60%">
+                <p> Morphing Only Apperance </p>
+            </td>
+            <td>
+                <img src="media/yajat_to_french_both.gif" style="width:60%">
+                <p>Morphing Both Shape and Appearance </p>
+            </td>
+        </tr>
+    </table>
+</body>
