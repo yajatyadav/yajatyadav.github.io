@@ -7752,7 +7752,7 @@ all of MD as it is not optimized for dense, information rich UIs.
                         <p>In this step, I write the function computeH(im1_points, im2_points), which recovers the
                             homography H mapping im1_points to im2_points. To find H, I use the the equation p' = Hp,
                             where p and p' are correspondences from the images. Since H_3_3 is a scaling factor and set
-                            to 8, this means if we have enough equations of the form p'_i = Hp_i, we can solve for the 8
+                            to 1, this means if we have enough equations of the form p'_i = Hp_i, we can solve for the 8
                             entries in H. Each correspondence gives us 2 equations, so we need at least 4 pairs of
                             points. However, to be robust to noise, I select more correspondences (around 15-20), set up
                             a linear system to solve for entries of H, and then use least squares to find the H matrix.
