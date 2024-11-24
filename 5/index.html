@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Project 5: Fun with Diffusion Models</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #dcdde1;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        td {
+            text-align: center;
+            padding: 10px;
+            vertical-align: top;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+        }
+
+        td p {
+            margin-top: 5px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Project 5: Fun with Diffusion Models</h1>
+
+    <h2>Part A</h2>
+    <p>In this part, we use the DeepFloyd IF Diffusion Model to show some interesting results! We start by first
+        sampling images from the pre-trained model using different prompts and `num_inference_steps`.</p>
+    <p>Here are the results of the 3 text prompts with 20 inference steps, using stage 1, which returns a 64x64 image:
+    </p>
+
+    <table>
+        <tr>
+            <td>
+                <img src="media/stage_1_20_1.png" alt="Snowy Mountain Village">
+                <p>an oil painting of a snowy mountain village</p>
+            </td>
+            <td>
+                <img src="media/stage_1_20_2.png" alt="Man Wearing Hat">
+                <p>a man wearing a hat</p>
+            </td>
+            <td>
+                <img src="media/stage_1_20_3.png" alt="Rocket Ship">
+                <p>a rocket ship</p>
+            </td>
+        </tr>
+    </table>
+
+    <p>Here are the outputs of stage 2, which returns 256x256 images, using 20 inference steps:</p>
+
+    <table>
+        <tr>
+            <td>
+                <img src="media/stage_2_20_1.png" alt="Snowy Mountain Village - Stage 2">
+                <p>an oil painting of a snowy mountain village</p>
+            </td>
+            <td>
+                <img src="media/stage_2_20_2.png" alt="Man Wearing Hat - Stage 2">
+                <p>a man wearing a hat</p>
+            </td>
+            <td>
+                <img src="media/stage_2_20_3.png" alt="Rocket Ship - Stage 2">
+                <p>a rocket ship</p>
+            </td>
+        </tr>
+    </table>
+
+    <p>Using the oil painting of a snowy mountain village, here are some other outputs with varying
+        `num_inference_steps` for both stages:</p>
+
+    <table>
+        <tr>
+            <td>
+                <img src="media/stage_1_100.png">
+                <p>Stage 1, 100 inference steps</p>
+            </td>
+            <td>
+                <img src="media/stage_1_500.png">
+                <p>Stage 1, 500 inference steps</p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/stage_2_100.png">
+                <p>Stage 2, 100 inference steps</p>
+            </td>
+            <td>
+                <img src="media/stage_2_500.png">
+                <p>Stage 2, 500 inference steps</p>
+            </td>
+        </tr>
+    </table>
+
+    <p><strong>Reflection: </strong> As we see, the outputs of stage2 are higher resolution and have more detail than
+        stage1. Furthermore, increasing the num_refinement_iters significantly improves image quality. We see the 200
+        iter image has more detailed, realistic houses and vegetation. However, with too many iterations, the returns
+        seem diminishing, potentially incorrect- with 500 iters, the model added a bridge in the image which doesn't
+        make sense in this context.</p>
+    <p><strong>Seed:</strong> At the top of each cell that creates results, I call `seed_everything()` to
+        ensure reproducible results. Throughout the notebook, I use 180 as my seed; near the end, I experimented
+        with different seeds and picked the best-looking one.</p>
+
+    <h3> 1.1: The Forward Process</h3>
+    <p>Here, we implement forward(im, t): this function performs the forward diffusion process, taking image im and
+        noising it until timestep t. Below is the starting Campanile image, along with it being noised at levels
+        250,500,750.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/test_im.png" style="width: 55%;">
+                <p>Original Test Image</p>
+            </td>
+            <td>
+                <img src=" media/test_im_250.png">
+                <p>Noise=250</p>
+            </td>
+            <td>
+                <img src="media/test_im_500.png">
+                <p>Noise=500</p>
+            </td>
+            <td>
+                <img src="media/test_im_750.png">
+                <p>Noise=750</p>
+            </td>
+        </tr>
+    </table>
+    <h3> 1.2: Classical Denoising</h3>
+    <p> This is our first approach to denoising using the classical method of Gaussian blur filtering. I experimented
+        with the Gaussians' parameters for each noise and display the best I could achieve. As we see,
+        getting good results even on the lower-noise image is basically impossible.
+    </p>
+    <table>
+        <tr>
+            <td>
+                <img src=" media/blur_denoise_250.png">
+            </td>
+            <td>
+                <img src="media/blur_denoise_500.png">
+            </td>
+            <td>
+                <img src="media/blur_denoise_750.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.3: One Step Denoising</h3>
+    <p> Here, we use the pretrained diffusion model to predict the noise in each of the above images. Using this
+        predicted noise, we can remove it and get an estimate of the original image. The results of this one-step
+        denoising are shown below.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/one_step_250.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/one_step_500.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/one_step_750.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.4: Iterative Denoising</h3>
+    <p>While one-step denoising is a step-up, it still started to degrade on higher noise. In this part, we iteratively
+        denoise: starting with noise x_1000, we can estimate x_999, and so on until the original image x_0. To speed up
+        this process, we can also stride our iterations, where the list strided_timesteps determines how many steps we
+        skip each iteration. In this part, I implement iterative_denoise(image, i_start): this function starts at
+        strided_timesteps[i_start] and denoises image repeateedly until we hit the final timestep entry.
+        The following result highlights this process: we first use forward() to noise our test_im with the appropriate
+        t. Then, we take this noisy image, and use iterative_denoise and try to get back the original image. </p>
+
+    <p> The first row displays every 5th iteration of the denoising loop. The second row shows the final image
+        predictions for the 3 denoising methods (classical, one-step, iterative) we have looked at so far.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/denoise_0.png">
+            </td>
+            <td>
+                <img src="media/denoise_1.png">
+            </td>
+            <td>
+                <img src="media/denoise_2.png">
+            </td>
+            <td>
+                <img src="media/denoise_3.png">
+            </td>
+            <td>
+                <img src="media/denoise_4.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/denoise_final_iter.png">
+            </td>
+            <td>
+                <img src="media/denoise_final_one.png">
+            </td>
+            <td>
+                <img src="media/denoise_final_classical.png">
+            </td>
+        </tr>
+    </table>
+
+    <h3> 1.5: Diffusion Model Sampling </h3>
+    <p> We now switch gears from denoising a noisy image to generating new images! We do this by starting with pure
+        random noise, setting i_start = 0, and lettting iterative_denoise run. By denoising pure noise, we are
+        essentially generating new content! Since the model requires language conditioning, we also use the string "a
+        high quality photo".</p>
+    <p> Below are 5 sampled images generated using the above procedure.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/sample_1.png">
+            </td>
+            <td>
+                <img src="media/sample_2.png">
+            </td>
+            <td>
+                <img src="media/sample_3.png">
+            </td>
+            <td>
+                <img src="media/sample_4.png">
+            </td>
+            <td>
+                <img src="media/sample_5.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.6: Classifier Free Guidance</h3>
+    <p> Some of the above generated samples weren't the best. In this part, we use classifier-free guidance to address
+        this. In CFG, in addition to estimating a text-conditioned noise estimate, we also estimate an unconditional
+        noise estimate, and combine these 2 (using gamma) to get our new noise estimate. Setting gamma > 1 allows us to
+        produce much higher quality images. In this part, I implement iterative_denoise_cfg, which works similar to
+        iterative_denoise, except using the new noise estimate described above. 5 sampled images using this method are
+        shown below. As we can see, these appear to be of much higher quality.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/cfg_1.png">
+            </td>
+            <td>
+                <img src="media/cfg_2.png">
+            </td>
+            <td>
+                <img src="media/cfg_3.png">
+            </td>
+            <td>
+                <img src="media/cfg_4.png">
+            </td>
+            <td>
+                <img src="media/cfg_5.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.7: Image-to-Image Translation</h3>
+    <p>In this part, we implement the SDEdit algorithm: by taking our test image, noising it a little, and then forcing
+        it back to the image manifold without any conditioning, we get a novel image that is still similar to our
+        original image! Below are the results on 3 test images, with varying levels of noise, where noise is indicated
+        by the i_start index.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/sdedit_1_og.png">
+                <img src="media/sdedit_1.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/sdedit_2_og.png">
+                <img src="media/sdedit_2.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/sdedit_3_og.png">
+                <img src="media/sdedit_3.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.7.1: Editing Web and Hand-Drawn Images</h3>
+    <p> Here, we start with non-realistic images like cliparts from the web or hand-drawn sketches. By repeating the
+        process above of noising these images and projecting them back on the image manifold, we are able to get
+        realistic versions of our cartoon/sketches.</p>
+    <p> The results are shown for 1 web image (lion clipart), as well as 2 hand-drawn sketches. For each image, we show
+        the
+        results for the same range of i_start values as above. </p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/lion.png">
+                <img src="media/lion_sdedit.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/hand_1.png">
+                <img src="media/hand_1_sdedit.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/hand_2.png">
+                <img src="media/hand_2_sdedit.png">
+            </td>
+        </tr>
+    </table>
+
+    <h3> 1.7.2: Inpainting</h3>
+    <p> In this part, we apply the same process as above except we only generate new content in a specific location
+        specified by a mask. To accomplish this, in our denoising loop, every step we will force x_t to have the same
+        pixels as x_original everywhere where the mask is 0- this way, new content is only created inside the edit mask.
+    </p>
+    <p> The results of this inpainting procedure on 3 test images are shown below. For each image, I first show the
+        original image, the mask, and the area to edit, as well as the final inpainting result.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/inpaint_1_info.png" style="width:40%;">
+                <img src="media/inpaint_1.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/inpaint_2_info.png" style="width:40%;">
+                <img src="media/inpaint_2.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/inpaint_3_info.png" style="width:40%;">
+                <img src="media/inpaint_3.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.7.3: Text-Conditioned Image-to-image Translation</h3>
+    <p>Now we guide the image projection through a language prompt. We use the precomputed prompt embeddings instead of
+        the "unconditional" prompt embedding in the iterative_denoise_cfg function now. The result is that the generated
+        images gradually look like the original image, but also fit the text description. </p>
+    <p> Results are shown on the test image and 2 other images, with the same i_start values for noise.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/sdedit_1_og.png">
+                <p> Text prompt: a rocket ship</p>
+                <img src="media/text_sdedit_1.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/sdedit_2_og.png">
+                <p> Text prompt: a mean waring a hat</p>
+                <img src="media/text_sdedit_2.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/sdedit_3_og.png">
+                <p> Text prompt: a photo of the amalfi coast</p>
+                <img src="media/text_sdedit_3.png">
+            </td>
+        </tr>
+    </table>
+    <h3> 1.8: Visual Anagrams</h3>
+    <p> In this part, we implement an optical illusion using diffusion models. We generate an image that looks like 2
+        different things when flipped upside down. To accomplish this, in our denoising loop, we call Unet(x_t, p_1) to
+        get noise estimate 1, and call flip(Unet(flip(x_t), p_2)) to get noise estimate 2. p_1 and p_2 here are the
+        different prompt embeddings. By averaging these noise estimates to get our new noise estimate, every iteration,
+        as we denoise, we are moving towards BOTH images, with one being flipped upside down. </p>
+    <p> 3 such visual anagrams are highlighted below.</p>
+    <table>
+        <tr>
+            <p><strong>"an oil painting of an old man" + "an oil painting of people around a campfire"</strong></p>
+            <img src="media/anagram_1.png">
+        </tr>
+        <tr>
+            <p><strong>"a photo of a dog" + "a photo of a man"</strong></p>
+            <img src="media/anagram_2.png">
+        </tr>
+        <tr>
+            <p><strong>"a man wearing a hat" + "a pencil"</strong></p>
+            <img src="media/anagram_3.png">
+
+        </tr>
+
+    </table>
+    <h3> 1.9: Hybrid Images</h3>
+    <p> Here, we create hybrid images that change in interpretation based on viewing distance, similar to project 2.
+        Similar to above, we generate 2 noise estimates, 1 for each image. Then, we low-pass filter 1 of these and
+        high-pass filter the other, and add them to get our new noise estimate. This way, as we iteratively denoise, we
+        are moving towards an image whose low-frequency components are similar to those of im1 AND whose high-frequency
+        components are similar to those of im2.</p>
+    <p> We show 3 such hybrid images below.</p>
+    <table>
+        <tr>
+            <p><strong>"a lithograph of a skull" + "a lithograph of waterfalls"</strong></p>
+            <img src="media/hybrid_1.png">
+        </tr>
+        <tr>
+            <p><strong>"a photo of a dog" + "a photo of the amalfi coast"</strong></p>
+            <img src="media/hybrid_2.png">
+        </tr>
+        <tr>
+            <p><strong>"an oil painting of a snowy mountain village" + "a rocket ship"</strong></p>
+            <img src="media/hybrid_3.png">
+
+        </tr>
+    </table>
+
+
+
+    <h2>Part B: Diffusion Models from Scratch!</h2>
+    <p> In this part, we build and train our own diffusion models from scratch on the MNIST dataset. </p>
+    <h3> Part 1: Training a Single-Step Denoising Unet</h3>
+    <p> In this part, we first use PyTorch to implement the UNet using the architecture specified. This is a one-step
+        denoiser as it takes in an noisy image z and predicts a clean iamge x. </p>
+    <p> To train this model to denoise, we generate noisy data from the MNIST data: for all (normalized) x in MNIST, the
+        noisy training point z = x + sigma * epsilon, where epsilon is sampled from the standard normal. Below is the
+        noising process visualized over sigmas in [0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0] for each sample digit.</p>
+    <table>
+        <tr>
+            <td>
+                <img src="media/noise_0.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_1.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_2.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_3.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_4.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_5.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_6.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_7.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_8.png">
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <img src="media/noise_9.png">
+            </td>
+        </tr>
+    </table>
+    <p> Below is the final training loss curve, as well as sample results on the test set after the 1st and 5th epoch.
+    </p>
+    <table>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Training Loss</strong>
+            </th>
+            <td colspan="5" style="text-align: center;">
+                <img src="media/train_loss_1.png">
+            </td>
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 1 Test Set Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_1_1_a.png">
+            </td>
+            <td>
+                <img src="media/epoch_1_1_b.png">
+            </td>
+            <td>
+                <img src="media/epoch_1_1_c.png">
+            </td>
+            <td>
+                <img src="media/epoch_1_1_d.png">
+            </td>
+            <td>
+                <img src="media/epoch_1_1_e.png">
+            </td>
+
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 5 Test Set Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_5_1_a.png">
+            </td>
+            <td>
+                <img src="media/epoch_5_1_b.png">
+            </td>
+            <td>
+                <img src="media/epoch_5_1_c.png">
+            </td>
+            <td>
+                <img src="media/epoch_5_1_d.png">
+            </td>
+            <td>
+                <img src="media/epoch_5_1_e.png">
+            </td>
+
+        </tr>
+    </table>
+    <p> Finally, to ensure the model's robustness, we also evaluate it on out-of-distribution noise levels after
+        training finishes. The results of the model denoising for varying sigma values is shown below.</p>
+    <table>
+        <tr>
+            <td style="text-align: center;">
+                <img src="media/ood_input.png" style="max-width: 100%; height: auto;">
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align: center;">
+                <img src="media/ood_results.png" style="width: 150%; height: auto;">
+            </td>
+        </tr>
+    </table>
+
+    <h3> 2.1-2.3: Adding Time-Conditioning to Unet</h3>
+    <p>In this part, I injected time into our unet using FCBlocks, updated the training loop to pass in normalized T as
+        training happens, and adjusted the ddpm_forward() function accordingly. I also implemented the ddpm_sample()
+        function for sampling digit images from the model after it finishes training. This was used to display sampling
+        results after 5 and 20 epochs of training.</p>
+    <p> Below is the training loss curve as well as sampling results after 5 and 20 epochs of training.</p>
+    <table>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Training Loss</strong>
+            </th>
+            <td colspan="5" style="text-align: center;">
+                <img src="media/train_loss_time.png">
+            </td>
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 5 Sampling Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_5_time.png">
+            </td>
+
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 20 Sampling Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_20_time.png">
+            </td>
+
+        </tr>
+    </table>
+
+    <h3> 2.4-2.5: Adding Class-Conditioning to Unet</h3>
+    <p> In this part, we additionally condition our Unet on the digit 0-9. We one-hot encode the image label, and also
+        dropout this vector 10% of the time so our model is still capable of unconditional generation. The c vector is
+        injected in the same place as the time, similarly using FCBlocks.</p>
+    <p> Below is the training loss curve as well as sampling results after 5 and 20 epochs of training.</p>
+    <table>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Training Loss</strong>
+            </th>
+            <td colspan="5" style="text-align: center;">
+                <img src="media/train_loss_class.png">
+            </td>
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 5 Sampling Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_5_class.png">
+            </td>
+
+        </tr>
+        <tr>
+            <th colspan="5" style="text-align: center;">
+                <strong>Epoch 20 Sampling Results</strong>
+            </th>
+            <td>
+                <img src="media/epoch_20_class.png">
+            </td>
+
+        </tr>
+    </table>
+
+
+
+
+</body>
+
+</html>
