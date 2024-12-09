@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Final Project: Neural Radiance Fields (NeRF)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #dcdde1;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        td {
+            text-align: center;
+            padding: 10px;
+            vertical-align: top;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+        }
+
+        td p {
+            margin-top: 5px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Final Project: Neural Radiance Fields (NeRF) </h1>
+
+    <p>In this project, we implement neural radiance fields first in 2d, which learns to map pixel coordinates to RGB
+        values. Then, we implement NeRF in 3d, where the model learns a 3D model of the scene: the model is trained to
+        predicte RGB and density values for any 3D point, and we can use volumetric rendering to use these predictions
+        to generate an image from any camera viewpoints. These rendered images are compared with the training camera
+        images and used to train the model, as well as to generate novel views of the scene.</p>
+
+    <h2> Part 1: Fit a Neural Field to a 2D Image</h2>
+    <p> In this part, I create a neural field F: {u, v} -> {r, g, b} and optimize it to fit to a particular image. Here
+        is an overview of my implementation.</p>
+    <ul>
+        <li>Multilayer Perceptron (MLP): I use a stack of 4 linear layers and RelU, with a final sigmoid layer to output
+            RGB in [0, 1]^3, since all inputs into the model are normalized. </li>
+        <li>Sinusoidal Positional Encoding (PE): To expand the dimensionality of the input into the network and have the
+            model pay attention to differing frequency components, I transform (x,y) by passsing x and y through sin()
+            and cos() of increasing frequencies. This leads to a 42-dimensional input into the MLP. </li>
+        <li>Dataloader: instead of training the network with all pixels every iteration, I write a function that
+            randomly samples N pixels every iteration, returning their coordinates and RGB values. </li>
+        <li>Training: For all tries, I used MSE(pred_RGB, actual_RGB) as my loss, Adam optimizer, learning_rate = 1e-2.
+            Using a batch
+            size of 10k and 1000 iterations, I trained the network. </li>
+    </ul>
+
+    <p> I tried out 2 images. For each, Intermediate results of the model learning + PSNR plots are shown below, using 3
+        different hyperparameter settings. </p>
+    <p> For hyperparameter tuning, I tried varying L (controls the length of the sinusoidal PE) and num_MLP_layers. </p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th colspan="6">Fox Image</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="label">Default: lr=1e-2, num_MLP_layers=4, PE_L = 10 Label</td>
+                <td><img src="media/fox_0_0.png"></td>
+                <td><img src="media/fox_0_50.png"></td>
+                <td><img src="media/fox_0_100.png"></td>
+                <td><img src="media/fox_0_300.png"></td>
+                <td><img src="media/fox_0_1000.png"></td>
+                <td><img src="media/fox_0_PSNR.png"></td>
+            </tr>
+            <tr>
+                <td class="label">Tune 1: PE_L = 30, everything else same</td>
+                <td><img src="media/fox_1_0.png"></td>
+                <td><img src="media/fox_1_50.png"></td>
+                <td><img src="media/fox_1_100.png"></td>
+                <td><img src="media/fox_1_300.png"></td>
+                <td><img src="media/fox_1_1000.png"></td>
+                <td><img src="media/fox_1_PSNR.png"></td>
+            </tr>
+            <tr>
+                <td class="label">Tune 2: num_MLP_layers = 10, everything else same</td>
+                <td><img src="media/fox_2_0.png"></td>
+                <td><img src="media/fox_2_50.png"></td>
+                <td><img src="media/fox_2_100.png"></td>
+                <td><img src="media/fox_2_300.png"></td>
+                <td><img src="media/fox_2_1000.png"></td>
+                <td><img src="media/fox_2_PSNR.png"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th colspan="6">Statue of Liberty Image</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="label">Default: lr=1e-2, num_MLP_layers=4, PE_L = 20 Label</td>
+                <td><img src="media/liberty_0_0.png"></td>
+                <td><img src="media/liberty_0_50.png"></td>
+                <td><img src="media/liberty_0_100.png"></td>
+                <td><img src="media/liberty_0_300.png"></td>
+                <td><img src="media/liberty_0_1000.png"></td>
+                <td><img src="media/liberty_0_PSNR.png"></td>
+            </tr>
+            <tr>
+                <td class="label">Tune 1: lr=1e-3, everything else same</td>
+                <td><img src="media/liberty_1_0.png"></td>
+                <td><img src="media/liberty_1_50.png"></td>
+                <td><img src="media/liberty_1_100.png"></td>
+                <td><img src="media/liberty_1_300.png"></td>
+                <td><img src="media/liberty_1_1000.png"></td>
+                <td><img src="media/liberty_1_PSNR.png"></td>
+            </tr>
+            <tr>
+                <td class="label">Tune 2: PE_L = 5, everything else same</td>
+                <td><img src="media/liberty_2_0.png"></td>
+                <td><img src="media/liberty_2_50.png"></td>
+                <td><img src="media/liberty_2_100.png"></td>
+                <td><img src="media/liberty_2_300.png"></td>
+                <td><img src="media/liberty_2_1000.png"></td>
+                <td><img src="media/liberty_2_PSNR.png"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2> Part 2: Fit a Neural Radiance Field from Multi-view Images</h2>
+    <p> In this part, we implement the actual 3d-NeRF. We will use the neural radiance field to represent a 3D space. We
+        use the lego scene of (200, 200, 3) images and pre-processed camera locations. Here is an overview of everything
+        I implemented.</p>
+
+    <ul>
+        <li> Part 2.1, Create Rays from Cameras
+            <ul>
+                <li>I implement transform(c2w, x_c), a batched function that takes a camera-to-world matrix, a point in
+                    camera coordinates x_c, and returns x_w, the world coordinates of this point.</li>
+                <li>Pixel to Camera Coordinates: I implement the batched function pixel_to_camera(K, uv, s): this takes
+                    a pixel coordinate [u, v] and uses cameras' intrinsic matrix K and focal s in order to find x_c, the
+                    corresponding camera coordinates of the pixel.</li>
+                <li> Pixel to Ray: Here, I implement pixel_to_ray(K, c2w, uv): a ray is defined with 2 vectors- r_0 and
+                    r_d. I found the origins r_0 by simply using the c2w matrix. To find r_d,
+                    I used the 2 functions defined above to get X_w, and then the formula to get the normalized ray
+                    direction. </li>
+                <li> The end result of this part is a way to convert pixels in camera images to rays in 3D space.</li>
+            </ul>
+        </li>
+        <li> Part 2.2, Sampling
+            <ul>
+                <li>Sampling Rays from Images: to sample N rays from M images, I first randomly select M cameras
+                    (without
+                    replacement), then N // M image-coordinates per camera. After shifting the image coordinates to
+                    pixel
+                    centers (by adding 0.5), I can then use pixel_to_ray from Part 2.1 to get a sample of N rays. I also
+                    keep track of what the corresponding ground truth, corresponding pixels' RGB values are. This
+                    function
+                    ends up returning N rays, and their corresponding RGB. </li>
+                <li> Sampling Points Along Rays: This part converts each ray above into discrete samples on the ray. I
+                    sample points along the ray between near and far, evenly spaced out. Then, if perturb=True (which is
+                    the
+                    case for training), I randomly shift each sampled point by t_width * standard_gaussian. My
+                    parameters
+                    were: near=2, far=2, n_samples=64, t_width=0.02. </li>
+                <li> The end result of this part is sampling rays from images, and then sampling points along these
+                    rays.
+                </li>
+            </ul>
+        </li>
+        <li> Part 2.3, Dataloader
+            <ul>
+                <li> I use all the functions defined above in my training loop in order to load in batches.
+                    sample_rays_from_images() returns rays, pixels. I then call points = points_along_rays(rays, ...).
+                    This way, I can pass in points and rays_d into the model and get out density, color. Using
+                    volumetric rendering (defined later), this gets converted to rendered_ccolors, and ultimately I can
+                    traing using loss(rendered_colors, pixels).</li>
+            </ul>
+        </li>
+        <li> Part 2.4, Neural Radiance Field
+            <ul>
+                <li>This part uses a MLP similar to Part 1. Inputs are now 3D world coordinates AND 3D vector of
+                    ray_drection. The model learns to output the color(determined by both pos and r_d) and the
+                    density(determined only by pos). Same as before, we use Sinusoidal Positional Embedding, linear and
+                    Relu layers, and a final Sigmoid. </li>
+                <li> The MLP was made deeper to handle this harder task. pos is also re-injected in the middle of the
+                    MLP (through concat) so the model doesn't forget about it. r_d is similarly injected through
+                    concatenation with the output of one of the linear layers.</li>
+            </ul>
+        </li>
+        <li> Part 2.5, Volume Rendering
+            <ul>
+                <li>Given the model's predictions for (RGB, density) along all points on a ray, we can integrate these
+                    values along the ray, weighted by the probability the ray doesn't "terminate" before that point, to
+                    get the final
+                    predicted pixel color (which is what is ultimately compared with the true pixel color).</li>
+                <li> I use torch to implement the discrete sum approximation. Using torch also ensures we can
+                    backpropagate our losses through this part. </li>
+            </ul>
+        </li>
+        <li> Training
+            <ul>
+                <li>
+                    I used Adam optimizer, learning_rate=5e-4. Every iteration, I sample rays+points along rays. I pass
+                    in model(points, rays_d) to get predicted RGB and density, which then go into volrend() to produce
+                    rendered_colors.
+                    I then find loss(rendered_colors, pixels) and backpropagate.</li>
+                <li>Every 100 iterations, I perform validation: this involves having the model ultimately predict pixel
+                    values on the validation cameras. We then compute and track the validation loss by comparing with
+                    the true images of the validation cameras. During validation, perturb=False for
+                    sample_points_along_rays to ensure every validation iteration picks the same points.</li>
+                <li> I also occasionally checkpoint- this was used to show the 2 novel-view videos below produced after
+                    1 and 2 hours of training. The first checkpoint was after 2500 iterations, and the second and final
+                    one after 5000 iterations.</li>
+                <li> To generate the model's image from a viewpoint, I query the model for a bunch of rays through all
+                    the pixels from this viewpoint, then assemble together the rendered colors returned to display the
+                    model's predicted image.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3> Part 2 Results </h3>
+    <p> Below I highlight the following:
+    <ul>
+        <li> Visualization of Rays and Samples </li>
+        <li> Training Process: same image shown across training iterations. The first row highlights progress after 1
+            hour of training (checkpoint), the second row continued trianing with this model and shows the next 2500
+            iterations.</li>
+        <li> PSNR curve on the training set</li>
+        <li> PSNR curve on the validation set</li>
+        <li> Novel View Video (produced using test set cameras) after 1 hour of training</li>
+        <li> Novel View Video (produced using test set cameras) after 2 hours of training</li>
+    </ul>
+    </p>
+
+    <p> Here, I visualize: 1) 100 rays (1 from each camera randomly chosen), cameras, as well as the sample points
+        along the rays, and 2)100 randomly chosen rays and sample points for 1 camera view.</p>
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <div class="image-container">
+                        <p>100 Rays/Cameras/Points Visualization</p>
+                        <img src="media/ray_vis.png" style="width: 500px; height: auto;">
+                    </div>
+                </td>
+                <td>
+                    <div class="image-container">
+                        <p>1 Camera Points Visualization</p>
+                        <img src="media/rays_one_cam.png" style="width: 500px; height: auto;">
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th colspan="6">Training Progress</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><img src="media/lego_0.png"></td>
+                <td><img src="media/lego_50.png"></td>
+                <td><img src="media/lego_200.png"></td>
+                <td><img src="media/lego_500.png"></td>
+                <td><img src="media/lego_1000.png"></td>
+                <td><img src="media/lego_2000.png"></td>
+                <td><img src="media/lego_2500.png"></td>
+            </tr>
+            <tr>
+                <td><img src="media/lego_3000.png"></td>
+                <td><img src="media/lego_4000.png"></td>
+                <td><img src="media/lego_5000.png"></td>
+            </tr>
+        </tbody>
+    </table>
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <div class="image-container">
+                        <p>Train PSNR</p>
+                        <img src="media/lego_PSNR_train_2.png" alt="Train PSNR">
+                    </div>
+                </td>
+                <td>
+                    <div class="image-container">
+                        <p>Validation PSNR</p>
+                        <img src="media/lego_PSNR_val_2.png" alt="Validation PSNR">
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="image-container">
+                        <p>Video after 1 hour (2500 iterations) of training</p>
+                        <img src="media/iter_2500.gif" style="width: 500px; height: auto;" alt="GIF Iteration 2500">
+                    </div>
+                </td>
+                <td>
+                    <div class="image-container">
+                        <p>Video after 2 hours (5000 iterations) of training</p>
+                        <img src="media/iter_5000.gif" style="width: 500px; height: auto;" alt="GIF Iteration 5000">
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+
+
+
+    <h2> Bells and Whistles</h2>
+    <p> By modifying the volrend function to take in an additional background_color tensor, we can render the above
+        video with a different background color. Specifically, I add background_color, weighted by the "final"
+        transmittance (found by multipylying all the T values), into the rendered_colors, and this makes only the
+        background change color
+        (since the transmittance for pixels of the Lego object would be very small).
+        Below, I use the 5000 iteration checkpoint model to render the Lego video with Red,
+        Green, and Blue backgrounds.</p>
+
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <div class="image-container">
+                        <p>Red Background</p>
+                        <img src="media/iter_5000_red.gif" style="width: 500px; height: auto;">
+                    </div>
+                </td>
+                <td>
+                    <div class="image-container">
+                        <p>Green Background</p>
+                        <img src="media/iter_5000_green.gif" style="width: 500px; height: auto;">
+                    </div>
+                </td>
+                <td>
+                    <div class="image-container">
+                        <p>Blue Background</p>
+                        <img src="media/iter_5000_blue.gif" style="width: 500px; height: auto;">
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+
+</html>
